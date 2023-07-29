@@ -15,7 +15,9 @@ BLINK=$(tput blink)
 REVERSE=$(tput smso)
 UNDERLINE=$(tput smul)
 
-echoerr() { [ "$DEBUG_LEVEL" == "debug" ] && printf "$1" ${*:2} >&2; }
+echoerr() { printf "$1" ${*:2} >&2; }
+
+echodebug() { [ "$DEBUG_LEVEL" == "debug" ] && printf "$1" ${*:2} >&2; }
 
 _FS="|";
 
@@ -421,4 +423,19 @@ function getIVA() {
     local archivo="$1"
     [[ ! -f "${archivo}" ]] && { echo "No existe archivo: [$1]"; return 1; }
     grep "Impuesto[Ret]*=\"[0]*2\"" "${archivo}" | grep -ioP "montoRet=\"\K([^\"]+)"
+}
+
+# Localizar facturas utiles (no recibos de nómina, no facturas con total=0)
+function identificarFacturasUtiles () {
+    [[ -z "$1" ]] && { echoerr "Se requiere listado de archivos xml"; return 1; }
+    facturasCandidatas="$1"
+    facturas=();
+    for archivo in ${facturasCandidatas}; do
+        _TMP=$(grep -o 'Total="0.00"' $archivo);
+        [ $? -ne 0 ] && facturas=( ${facturas[@]} $archivo );
+    done;
+    for archivo in ${facturas[@]}; do
+        _TMP=$(grep 'TipoDeComprobante="N"' $archivo);
+        [ $? -ne 0 ] && echo $archivo;
+    done
 }
