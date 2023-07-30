@@ -495,9 +495,11 @@ function identificarFacturasUtiles () {
 # @param $3 - Opcional, si se indica false, regresa listado de archivos donde no exista rfcDeducibles
 # @return Listado de archivos donde está rfcDeducibles. Si $3==false, regresa listado donde no encuentra rfcDeducibles
 function identificarFacturasDeduccionesPersonales () {
+    # set -x
     [[ -z "$1" ]] && { echoerr "Se requiere listado de archivos xml"; return 1; }
     [[ -z "$2" ]] && { echoerr "Se requiere listado de RFC a buscar"; return 1; }
-    [[ -n "$3" && "$3"=="false" ]] && _GREPOPT="v" || _GREPOPT="";
+    local _invertido=false
+    [[ -n "$3" && "$3"=="false" ]] && _invertido=true;
     facturasCandidatas="$1"
     rfcEmisores="$2"
     echo "$rfcEmisores" > "$TMP/rfcEmisores.tmp"
@@ -505,11 +507,54 @@ function identificarFacturasDeduccionesPersonales () {
     # Esto evita problemas en nombre de directorios donde haya espacios
     local IFS=$'\n'
     for archivo in ${facturasCandidatas}; do
-        _TMP=$(grep -${_GREPOPT}f "$TMP/rfcEmisores.tmp" "$archivo");
-        [ $? -eq 0 ] && echo "$archivo";
+        _TMP=$(grep -f "$TMP/rfcEmisores.tmp" "$archivo");
+        local _R=$?
+        if [[ "$_invertido" == true ]]; then
+            [ $_R -eq 1 ] && echo "$archivo";
+        else
+            [ $_R -eq 0 ] && echo "$archivo";
+        fi
     done;
     rm "$TMP/rfcEmisores.tmp"
+    # set +x
 }
 
-#
-# tmpIFS=$IFS; IFS=$'\n'; for archivo in $gastos; do cat "$archivo" | read_parse_cfdi; done; IFS=$tmpIFS;
+# Aplicar funcion despues de #identificarFacturasDeduccionesPersonales
+function identificarGastosNoUtiles () {
+    [[ -z "$1" ]] && { echoerr "Se requiere listado de archivos xml"; return 1; }
+    [[ -z "$2" ]] && { echoerr "Se requiere listado de RFC a buscar"; return 1; }
+    local _invertido=false
+    [[ -n "$3" && "$3"=="false" ]] && _invertido=true;
+    facturasCandidatas="$1"
+    rfcEmisores="$2"
+    echo "$rfcEmisores" > "$TMP/rfcEmisoresNoUtil.tmp"
+    # Obliga a usar solamente \n como separador de registro en el listado de archivos entregados.
+    # Esto evita problemas en nombre de directorios donde haya espacios
+    local IFS=$'\n'
+    for archivo in ${facturasCandidatas}; do
+        _TMP=$(grep -f "$TMP/rfcEmisoresNoUtil.tmp" "$archivo");
+        local _R=$?
+        if [[ "$_invertido" == true ]]; then
+            [ $_R -eq 1 ] && echo "$archivo";
+        else
+            [ $_R -eq 0 ] && echo "$archivo";
+        fi
+    done;
+    rm "$TMP/rfcEmisoresNoUtil.tmp"
+}
+
+# recibidas=$(ls -d "$HOME_FACTURAS/recibidas"/*.xml)
+# ANNIO=2022
+# MES=04
+# recibidasMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -l 'FechaTimbrado="'$ANNIO'-'$MES $recibidas; IFS=$tmpIFS;)
+# facturasGastos=$(identificarFacturasUtiles "$recibidasMes")
+# listadoRFCDeducibles='/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/rfcEmisoresGastosDeducibles.txt'
+# rfcDeducibles=$(cut -f1 "$listadoRFCDeducibles")
+# deducciones=$(identificarFacturasDeduccionesPersonales "$facturasGastos" "$rfcDeducibles")
+# gastos=$(identificarFacturasDeduccionesPersonales "$facturasGastos" "$rfcDeducibles" false)
+# listadoRFCNoUtil='/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/rfcEmisoresGastosNoUtil.txt'
+# rfcNoUtil=$(cut -f1 "$listadoRFCNoUtil")
+# gastos=$(identificarGastosNoUtiles "$gastos" "$rfcNoUtil" false)
+# registros=$(tmpIFS=$IFS; IFS=$'\n'; for archivo in $gastos; do cat "$archivo" | read_parse_cfdi; done; IFS=$tmpIFS;)
+# Imprimir los registros en formato compatible con "HOJA DE TRABAJO"
+# awk 'BEGIN{FS="|";OFS=FS;}{print $23,$14,$15,$17,$18,$4,$9,$7,$22}' <<< "$registros"
