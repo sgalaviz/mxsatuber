@@ -17,7 +17,7 @@ UNDERLINE=$(tput smul)
 
 echoerr() { printf "$1" ${*:2} >&2; }
 
-echodebug() { [ "$DEBUG_LEVEL" == "debug" ] && printf "$1" ${*:2} >&2; }
+echodebug() { [[ "$DEBUG_LEVEL" == "debug" ]] && printf "$1" ${*:2} >&2; }
 
 _FS="|";
 
@@ -208,7 +208,6 @@ function __stack_size () {
 }
 
 parse_cfdi () {
-    set +xT
     # if [[ $TAG_NAME = "foo" ]] ; then
     #     eval local $ATTRIBUTES
     #     echo "foo size is: $size"
@@ -218,6 +217,8 @@ parse_cfdi () {
     # fi
     # Con cada invocación, se vaciaba la pila profundidad
     # 
+
+    # Atributos a obtener por elemento XML
     local cfdi_Comprobante=(
         "Version"
         "Serie"
@@ -263,7 +264,14 @@ parse_cfdi () {
         "Importe"
         "ObjetoImp"
         )
-    local cfdi_Traslado=(
+    local cfdi_Concepto_Traslado=(
+        "Base"
+        "Impuesto"
+        "TipoFactor"
+        "TasaOCuota"
+        "Importe"
+        )
+    local cfdi_Concepto_Traslado=(
         "Base"
         "Impuesto"
         "TipoFactor"
@@ -272,6 +280,12 @@ parse_cfdi () {
         )
     local cfdi_Impuestos=(
         "TotalImpuestosTrasladados"
+        )
+    local cfdi_ImpuestosTrasladados=(
+        "Impuesto"
+        "TipoFactor"
+        "TasaOCuota"
+        "Importe"
         )
     local tfd_TimbreFiscalDigital=(
         "UUID"
@@ -306,15 +320,18 @@ parse_cfdi () {
             __stack_push "$TAG_NAME"
             local _size=$(__stack_size)
             local _peek=$(__stack_peek 2>/dev/null)
-            echoerr "${CYAN}Profundidad:${NORMAL}%s\t${CYAN}Tope_Pila:${NORMAL}%s\n" "${_size}" "${_peek}"
+            echodebug "${CYAN}Profundidad:${NORMAL}%s\t${CYAN}Tope_Pila:${NORMAL}%s\n" "${_size}" "${_peek}"
             ;;
         "cfdi:Concepto" )
             __stack_push "$TAG_NAME"
             local _size=$(__stack_size)
             local _peek=$(__stack_peek 2>/dev/null)
-            echoerr "${CYAN}Profundidad:${NORMAL}%s\t${CYAN}Tope_Pila:${NORMAL}%s\n" "${_size}" "${_peek}"
+            echodebug "${CYAN}Profundidad:${NORMAL}%s\t${CYAN}Tope_Pila:${NORMAL}%s\n" "${_size}" "${_peek}"
             # parseElementAttributesByStr cfdi_Concepto "$ATTRIBUTES"
             # echo
+            ;;
+        "/cfdi:Concepto" )
+            __stack_pop;
             ;;
         "cfdi:Impuestos" )
             local _size=$(__stack_size)
@@ -331,10 +348,10 @@ parse_cfdi () {
             # donde se tiene el atributo TotalImpuestosTrasladados
             local _size=$(__stack_size)
             local _peek=$(__stack_peek 2>/dev/null)
-            echoerr "${CYAN}Profundidad:${NORMAL}%s\t${CYAN}Tope_Pila:${NORMAL}%s\n" "${_size}" "${_peek}"
-            if [[ ${_size} -gt 0 ]]; then
-                if [[ ${_peek} == "cfdi:Impuestos" ]]; then
-                    parseElementAttributesByStr cfdi_Traslado "$ATTRIBUTES"
+            echodebug "${CYAN}Profundidad:${NORMAL}%s\t${CYAN}Tope_Pila:${NORMAL}%s\n" "${_size}" "${_peek}"
+            if [[ ${_size} -eq 2 ]]; then
+                if [[ ${_peek} == "cfdi:Traslados" ]]; then
+                    parseElementAttributesByStr cfdi_ImpuestosTrasladados "$ATTRIBUTES"
                     echo
                 fi
             fi
@@ -360,7 +377,7 @@ parse_cfdi () {
             local _size=$(__stack_size)
             local _peek=$(__stack_peek 2>/dev/null)
             if [[ ${_size} -gt 0 ]] ; then
-                echoerr "${CYAN}Profundidad:${NORMAL}%s\t${CYAN}Tag_cierre:${NORMAL}%s\t${CYAN}Tope_Pila:${NORMAL}%s\n" "${_size}" "${TAG_NAME}" "${_peek}"
+                echodebug "${CYAN}Profundidad:${NORMAL}%s\t${CYAN}Tag_cierre:${NORMAL}%s\t${CYAN}Tope_Pila:${NORMAL}%s\n" "${_size}" "${TAG_NAME}" "${_peek}"
                 if [[ ${_peek} == "${TAG_NAME:1}" ]]; then
                     __stack_pop
                 fi
@@ -371,7 +388,6 @@ parse_cfdi () {
             printf "%s\n" "$TAG_NAME"
             ;;
     esac
-    set -xT
 }
 
 # Modo de uso:
@@ -384,15 +400,15 @@ read_parse_cfdi () {
     __stack_clear
     while read_dom; do
         _OUT=$(parse_cfdi)
-        echoerr "${CYAN}TAG_NAME:${NORMAL}%s\n" ${TAG_NAME}
+        echodebug "${CYAN}TAG_NAME:${NORMAL}%s\n" ${TAG_NAME}
         if [[ "${#_OUT}" -gt 0 ]]; then
             if [[ "$TAG_NAME" == "cfdi:Comprobante" && primero -eq 1 ]]; then
                 _TITLE="$(awk 'BEGIN{FS="\n"; RS="^^"}{print $1}' <<< "$_OUT")"
                 _REC="$(awk 'BEGIN{FS="\n"; RS="^^"}{print $2}' <<< "$_OUT")"
                 primero=0
             else
-                if [[ "$TAG_NAME" == "cfdi:Traslado" ]]; then
-                    echoerr "${CYAN}#_OUT:${NORMAL}%s\n" ${_OUT}
+                if [[ "$TAG_NAME" == "cfdi:Impuestos" ]]; then
+                    echodebug "${CYAN}#_OUT:${NORMAL}%s\n" ${_OUT}
                 fi
                 _TITLE="${_TITLE}|$(awk 'BEGIN{FS="\n"; RS="^^"}{print $1}' <<< "$_OUT")"
                 _REC="${_REC}|$(awk 'BEGIN{FS="\n"; RS="^^"}{print $2}' <<< "$_OUT")"
@@ -426,16 +442,74 @@ function getIVA() {
 }
 
 # Localizar facturas utiles (no recibos de nómina, no facturas con total=0)
+# Obtiene la lista de facturas recibidas con path absoluto
+# Modo de uso:
+# recibidas=$(ls -d "$HOME_FACTURAS/recibidas"/*.xml)
+#
+# Se puede añadir un segundo filtro para determinar todas las de un mes, por
+# ejemplo abril
+#
+# Notar que es necesario remplazar el separador interno de registros para
+# evitar problemas con nombres de archivos que contenga espacios
+#
+# recibidasAbril=$(tmpIFS=$IFS; IFS=$'\n'; grep -l 'Fecha="2022-04' $recibidas; IFS=$tmpIFS;)
+# identificarFacturasUtiles "$recibidas"
+# De la siguiente forma obtenemos un listado útil para #identificarFacturasDeduccionesPersonales
+# facturasGastos=$(identificarFacturasUtiles "$recibidasAbril")
+#
+# @param $1 - Listado de archivos XML (CFDI) de facturas (recibidas)
 function identificarFacturasUtiles () {
     [[ -z "$1" ]] && { echoerr "Se requiere listado de archivos xml"; return 1; }
     facturasCandidatas="$1"
     facturas=();
+    # Obliga a usar solamente \n como separador de registro en el listado de archivos entregados.
+    # Esto evita problemas en nombre de directorios donde haya espacios
+    local IFS=$'\n'
+    # Identificar todos los XML con TipoDeComprobante="I" (ingreso)
+    # De esta forma se valida: a) es un CFDI y; b) es de tipo ingreso (identificado como un gasto)
     for archivo in ${facturasCandidatas}; do
-        _TMP=$(grep -o 'Total="0.00"' $archivo);
-        [ $? -ne 0 ] && facturas=( ${facturas[@]} $archivo );
+        _TMP=$(grep -o 'TipoDeComprobante="I"' "$archivo");
+        [ $? -eq 0 ] && facturas=( ${facturas[@]} "$archivo" );
     done;
+
+    # Identificar las facturas donde el total es diferente a 0
     for archivo in ${facturas[@]}; do
-        _TMP=$(grep 'TipoDeComprobante="N"' $archivo);
-        [ $? -ne 0 ] && echo $archivo;
-    done
+        _TMP=$(grep -oP 'Total="0[.0]*"' "$archivo");
+        #[ $? -ne 0 ] && facturas=( ${facturas[@]} "$archivo" );
+        [ $? -ne 0 ] && echo "$archivo";
+    done;
 }
+
+# Identificar facturas XML CFDI que pertenezcan a ciertos RFCs emisores de
+# deduccioes personales
+#
+# Se sugiere tener el listado de RFCs en un archivo indicando adicional alguna nota para saber de qué se trata
+# Ej.
+# listadoRFCDeducibles='/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/rfcEmisoresGastosDeducibles.txt'
+# rfcDeducibles=$(cut -f1 "$listadoRFCDeducibles")
+# deducciones=$(identificarFacturasDeduccionesPersonales "$facturasGastos" "$rfcDeducibles")
+# gastos=$(identificarFacturasDeduccionesPersonales "$facturasGastos" "$rfcDeducibles" false)
+#
+# @param $1 - Listado de facturas
+# @param $2 - Listado de RFCs de emisores de deducciones personales
+# @param $3 - Opcional, si se indica false, regresa listado de archivos donde no exista rfcDeducibles
+# @return Listado de archivos donde está rfcDeducibles. Si $3==false, regresa listado donde no encuentra rfcDeducibles
+function identificarFacturasDeduccionesPersonales () {
+    [[ -z "$1" ]] && { echoerr "Se requiere listado de archivos xml"; return 1; }
+    [[ -z "$2" ]] && { echoerr "Se requiere listado de RFC a buscar"; return 1; }
+    [[ -n "$3" && "$3"=="false" ]] && _GREPOPT="v" || _GREPOPT="";
+    facturasCandidatas="$1"
+    rfcEmisores="$2"
+    echo "$rfcEmisores" > "$TMP/rfcEmisores.tmp"
+    # Obliga a usar solamente \n como separador de registro en el listado de archivos entregados.
+    # Esto evita problemas en nombre de directorios donde haya espacios
+    local IFS=$'\n'
+    for archivo in ${facturasCandidatas}; do
+        _TMP=$(grep -${_GREPOPT}f "$TMP/rfcEmisores.tmp" "$archivo");
+        [ $? -eq 0 ] && echo "$archivo";
+    done;
+    rm "$TMP/rfcEmisores.tmp"
+}
+
+#
+# tmpIFS=$IFS; IFS=$'\n'; for archivo in $gastos; do cat "$archivo" | read_parse_cfdi; done; IFS=$tmpIFS;
