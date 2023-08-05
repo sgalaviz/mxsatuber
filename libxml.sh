@@ -544,16 +544,16 @@ function identificarGastosNoUtiles () {
 }
 
 # recibidas=$(ls -d "$HOME_FACTURAS/recibidas"/*.xml)
+# listadoRFCDeducibles='/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/rfcEmisoresGastosDeducibles.txt'
+# listadoRFCNoUtil='/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/rfcEmisoresGastosNoUtil.txt'
+# rfcDeducibles=$(cut -f1 "$listadoRFCDeducibles")
+# rfcNoUtil=$(cut -f1 "$listadoRFCNoUtil")
 # ANNIO=2022
 # MES=04
 # recibidasMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -l 'FechaTimbrado="'$ANNIO'-'$MES $recibidas; IFS=$tmpIFS;)
 # facturasGastos=$(identificarFacturasUtiles "$recibidasMes")
-# listadoRFCDeducibles='/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/rfcEmisoresGastosDeducibles.txt'
-# rfcDeducibles=$(cut -f1 "$listadoRFCDeducibles")
 # deducciones=$(identificarFacturasDeduccionesPersonales "$facturasGastos" "$rfcDeducibles")
 # gastos=$(identificarFacturasDeduccionesPersonales "$facturasGastos" "$rfcDeducibles" false)
-# listadoRFCNoUtil='/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/rfcEmisoresGastosNoUtil.txt'
-# rfcNoUtil=$(cut -f1 "$listadoRFCNoUtil")
 # gastos=$(identificarGastosNoUtiles "$gastos" "$rfcNoUtil" false)
 # registros=$(tmpIFS=$IFS; IFS=$'\n'; for archivo in $gastos; do cat "$archivo" | read_parse_cfdi; done; IFS=$tmpIFS;)
 # Imprimir los registros en formato compatible con "HOJA DE TRABAJO"
