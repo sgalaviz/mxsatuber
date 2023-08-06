@@ -96,18 +96,33 @@ function parseElementAttributesByStr () {
     local record=""
     local tmp1=""
     local tmp2=""
+    
+    # Es posible que un atributo pueda ser llamado de dos formas, esto por la
+    # version de la implemtación de la version del xml o la falta de estandarizacion
     for atributo in ${atributos[@]}; do
+        # Se puede poner nombres alternativos a un mismo atributos, separar con pipe
+        _atributo="${atributo}"
+        if [[ "${atributo}" =~ "|" ]]; then
+            # nombre de atributo multiple
+            # Verificar cuál, de las opciones indicadas, existe
+            local _tmpIFS=$IFS;
+            IFS="|";
+            for _attr in $atributo; do
+                _atributo="${_attr}"
+                [ ! -z ${!_attr} ] && break;
+            done
+        fi
         if [[ $primero -eq 1 ]]; then
-            printf -v title "%s" "${atributo}"
+            printf -v title "%s" "${_atributo}"
             # Indirect variable reference
             # https://unix.stackexchange.com/questions/41406/use-a-variable-reference-inside-another-variable
-            printf -v record "%s" "${!atributo}"
+            printf -v record "%s" "${!_atributo}"
             primero=0;
         else
-            printf -v tmp1 "${_FS}%s" "${atributo}"
+            printf -v tmp1 "${_FS}%s" "${_atributo}"
             # Indirect variable reference
             # https://unix.stackexchange.com/questions/41406/use-a-variable-reference-inside-another-variable
-            printf -v tmp2 "${_FS}%s" "${!atributo}"
+            printf -v tmp2 "${_FS}%s" "${!_atributo}"
 
             title="${title}${tmp1}"
             record="${record}${tmp2}"
@@ -271,13 +286,6 @@ parse_cfdi () {
         "TasaOCuota"
         "Importe"
         )
-    local cfdi_Concepto_Traslado=(
-        "Base"
-        "Impuesto"
-        "TipoFactor"
-        "TasaOCuota"
-        "Importe"
-        )
     local cfdi_Impuestos=(
         "TotalImpuestosTrasladados"
         )
@@ -421,6 +429,145 @@ read_parse_cfdi () {
     echo "$_REC"
 }
 
+parse_retencion () {
+    # if [[ $TAG_NAME = "foo" ]] ; then
+    #     eval local $ATTRIBUTES
+    #     echo "foo size is: $size"
+    # elif [[ $TAG_NAME = "bar" ]] ; then
+    #     eval local $ATTRIBUTES
+    #     echo "bar type is: $type"
+    # fi
+    # Con cada invocación, se vaciaba la pila profundidad
+    # 
+
+    # Atributos a obtener por elemento XML
+    local retenciones_Retenciones=(
+        "Version"
+        "FolioInt"
+        "FechaExp"
+        "CveRetenc"
+        # "Certificado"
+        # "NoCertificado"
+        # "Sello"
+        )
+    local retenciones_Emisor=(
+        "RfcE|RFCEmisor"
+        "NomDenRazSocE"
+        "RegimenFiscalE"
+        )
+    local retenciones_Receptor=(
+        "NacionalidadR|Nacionalidad"
+        )
+    local retenciones_Nacional=(
+        "RfcR|RFCRecep"
+        "NomDenRazSocR"
+        "DomicilioFiscalR"
+        )
+    local retenciones_Periodo=(
+        "MesIni"
+        "MesFin"
+        "Ejercicio|Ejerc"
+        )
+    local retenciones_Totales=(
+        "MontoTotOperacion|montoTotOperacion"
+        "MontoTotGrav|montoTotGrav"
+        "MontoTotExent|montoTotExent"
+        "MontoTotRet|montoTotRet"
+        )
+    local plataformasTecnologicas_ServiciosPlataformasTecnologicas=(
+        "Periodicidad"
+        "NumServ"
+        "MonTotServSIVA"
+        "TotalIVATrasladado"
+        "TotalIVARetenido"
+        "TotalISRRetenido"
+        "DifIVAEntregadoPrestServ"
+        "MonTotalporUsoPlataforma"
+        )
+    local tfd_TimbreFiscalDigital=(
+        "UUID"
+        )
+    case $TAG_NAME in
+        "retenciones:Retenciones" )
+            parseElementAttributesByStr retenciones_Retenciones "$ATTRIBUTES"
+            echo
+            ;;
+        "retenciones:Emisor" )
+            parseElementAttributesByStr retenciones_Emisor "$ATTRIBUTES"
+            echo
+            ;;
+        "retenciones:Receptor" )
+            parseElementAttributesByStr retenciones_Receptor "$ATTRIBUTES"
+            echo
+            ;;
+        "retenciones:Nacional" )
+            parseElementAttributesByStr retenciones_Nacional "$ATTRIBUTES"
+            echo
+            ;;
+        "retenciones:Periodo" )
+            parseElementAttributesByStr retenciones_Periodo "$ATTRIBUTES"
+            echo
+            ;;
+        "retenciones:Totales" )
+            parseElementAttributesByStr retenciones_Totales "$ATTRIBUTES"
+            echo
+            ;;
+        "plataformasTecnologicas:ServiciosPlataformasTecnologicas" )
+            parseElementAttributesByStr plataformasTecnologicas_ServiciosPlataformasTecnologicas "$ATTRIBUTES"
+            echo
+            ;;
+        "tfd:TimbreFiscalDigital" )
+            parseElementAttributesByStr tfd_TimbreFiscalDigital "$ATTRIBUTES"
+            echo
+            ;;
+        \?* )
+            #omitir tag <?xml>
+            ;;
+        \/* )
+            local _size=$(__stack_size)
+            local _peek=$(__stack_peek 2>/dev/null)
+            if [[ ${_size} -gt 0 ]] ; then
+                echodebug "${CYAN}Profundidad:${NORMAL}%s\t${CYAN}Tag_cierre:${NORMAL}%s\t${CYAN}Tope_Pila:${NORMAL}%s\n" "${_size}" "${TAG_NAME}" "${_peek}"
+                if [[ ${_peek} == "${TAG_NAME:1}" ]]; then
+                    __stack_pop
+                fi
+            fi
+            ;;
+        * )
+            # Tag no identificado previamente
+            #omitir tag <?xml>
+            ;;
+    esac
+}
+
+# Modo de uso:
+# cat archivo.xml | read_parse_retencion
+read_parse_retencion () {
+    _OUT=""
+    _TITLE=""
+    _REC=""
+    primero=1
+    __stack_clear
+    while read_dom; do
+        _OUT=$(parse_retencion)
+        echodebug "${CYAN}TAG_NAME:${NORMAL}%s\n" ${TAG_NAME}
+        if [[ "${#_OUT}" -gt 0 ]]; then
+            if [[ "$TAG_NAME" == "retenciones:Retenciones" && primero -eq 1 ]]; then
+                _TITLE="$(awk 'BEGIN{FS="\n"; RS="^^"}{print $1}' <<< "$_OUT")"
+                _REC="$(awk 'BEGIN{FS="\n"; RS="^^"}{print $2}' <<< "$_OUT")"
+                primero=0
+            else
+                _TITLE="${_TITLE}|$(awk 'BEGIN{FS="\n"; RS="^^"}{print $1}' <<< "$_OUT")"
+                _REC="${_REC}|$(awk 'BEGIN{FS="\n"; RS="^^"}{print $2}' <<< "$_OUT")"
+            fi
+        fi
+    done
+    if [[ "$1" == "conEncabezado" ]]; then
+        echo "$_TITLE"
+    fi
+    echo "$_REC"
+}
+
 # cd $HOME_WIN/Downloads/borrame/facturas/2022/emitidas/
 # source $HOME_WIN/Documents/Projects/uber/libxml.sh
 # time { primero=1; output=cfdi_emitidas.txt; printf "" > "${output}"; for archivo in $(ls *.xml); do printf "." ; if [[ $primero -eq 1 ]]; then cat "$archivo" | read_parse_cfdi "conEncabezado" >> "${output}"; primero=0; else cat "$archivo" | read_parse_cfdi >> "${output}"; fi; done; echo; }
@@ -543,6 +690,8 @@ function identificarGastosNoUtiles () {
     rm "$TMP/rfcEmisoresNoUtil.tmp"
 }
 
+# cd "$HOME_PROJECT/mxsatuber"
+# source libxml.sh
 # recibidas=$(ls -d "$HOME_FACTURAS/recibidas"/*.xml)
 # listadoRFCDeducibles='/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/rfcEmisoresGastosDeducibles.txt'
 # listadoRFCNoUtil='/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/rfcEmisoresGastosNoUtil.txt'
@@ -558,3 +707,17 @@ function identificarGastosNoUtiles () {
 # registros=$(tmpIFS=$IFS; IFS=$'\n'; for archivo in $gastos; do cat "$archivo" | read_parse_cfdi; done; IFS=$tmpIFS;)
 # Imprimir los registros en formato compatible con "HOJA DE TRABAJO"
 # awk 'BEGIN{FS="|";OFS=FS;}{print $23,$14,$15,$17,$18,$4,$9,$7,$22}' <<< "$registros"
+#
+# ANNIO=2022
+# retenciones=$(ls -d "$HOME_FACTURAS/retenciones"/*.xml)
+# MES=5
+# 
+# retencionesMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -lP 'Periodo MesIni="0?'$MES'" MesFin="0?'$MES'" (Ejerc|Ejercicio)="'$ANNIO'"' $retenciones; IFS=$tmpIFS;)
+# registros=$(tmpIFS=$IFS; IFS=$'\n'; for archivo in $retencionesMes; do cat "$archivo" | read_parse_retencion; done; IFS=$tmpIFS;)
+# awk 'BEGIN{FS="|";OFS=FS;}{print $27,$5,$6,$9,$10,$3,$13,$14,$15,$24,$23}' <<< "$registros"
+#
+# for MES in {1..12}; do
+#   retencionesMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -lP 'Periodo MesIni="0?'$MES'" MesFin="0?'$MES'" (Ejerc|Ejercicio)="'$ANNIO'"' $retenciones; IFS=$tmpIFS;)
+#   registros=$(tmpIFS=$IFS; IFS=$'\n'; for archivo in $retencionesMes; do cat "$archivo" | read_parse_retencion; done; IFS=$tmpIFS;)
+#   awk 'BEGIN{FS="|";OFS=FS;}{print $27,$5,$6,$9,$10,$3,$13,$14,$15,$24,$23}' <<< "$registros"
+# done
