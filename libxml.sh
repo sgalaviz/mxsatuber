@@ -59,6 +59,8 @@ read_dom () {
     local IFS=\>
     read -d \< ENTITY CONTENT
     local ret=$?
+    # Limpiar caracter de cierre de tag al final: /> o ?>
+    [[ "${ENTITY:(-1)}" == '/' || "${ENTITY:(-1)}" == '?' ]] && ENTITY="${ENTITY::-1}"
     TAG_NAME=${ENTITY%% *}
     ATTRIBUTES=${ENTITY#* }
     return $ret
@@ -712,12 +714,12 @@ function identificarGastosNoUtiles () {
 # retenciones=$(ls -d "$HOME_FACTURAS/retenciones"/*.xml)
 # MES=5
 # 
-# retencionesMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -lP 'Periodo MesIni="0?'$MES'" MesFin="0?'$MES'" (Ejerc|Ejercicio)="'$ANNIO'"' $retenciones; IFS=$tmpIFS;)
+# retencionesMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -lP 'Periodo [^"]+"[^"]+" MesFin="0?'$MES'" (Ejerc|Ejercicio)="'$ANNIO'"' $retenciones; IFS=$tmpIFS;)
 # registros=$(tmpIFS=$IFS; IFS=$'\n'; for archivo in $retencionesMes; do cat "$archivo" | read_parse_retencion; done; IFS=$tmpIFS;)
 # awk 'BEGIN{FS="|";OFS=FS;}{print $27,$5,$6,$9,$10,$3,$13,$14,$15,$24,$23}' <<< "$registros"
 #
 # for MES in {1..12}; do
-#   retencionesMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -lP 'Periodo MesIni="0?'$MES'" MesFin="0?'$MES'" (Ejerc|Ejercicio)="'$ANNIO'"' $retenciones; IFS=$tmpIFS;)
+#   retencionesMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -lP 'Periodo [^"]+"[^"]+" MesFin="0?'$MES'" (Ejerc|Ejercicio)="'$ANNIO'"' $retenciones; IFS=$tmpIFS;)
 #   registros=$(tmpIFS=$IFS; IFS=$'\n'; for archivo in $retencionesMes; do cat "$archivo" | read_parse_retencion; done; IFS=$tmpIFS;)
 #   awk 'BEGIN{FS="|";OFS=FS;}{print $27,$5,$6,$9,$10,$3,$13,$14,$15,$24,$23}' <<< "$registros"
 # done
