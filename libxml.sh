@@ -89,6 +89,8 @@ read_parse_dom () {
 function parseElementAttributesByStr () {
     [ -z "${1}" ] && { echo "Falta arreglo con los atributos del elemento DOM"; return 1; }
     [ -z "${2}" ] && { echo "Falta str con el contenido de los atributos del elemento DOM a parsear"; return 1; }
+    local _FS="$_FS"
+    [ -n "${3}" ] && _FS="${3}"
     local atributos="$1[@]"
     atributos=("${!atributos}")
     local strToParse="${2}"
@@ -476,6 +478,12 @@ parse_retencion () {
         "MontoTotExent|montoTotExent"
         "MontoTotRet|montoTotRet"
         )
+    local retenciones_ImpRetenidos=(
+        "BaseRet"
+        "Impuesto"
+        "montoRet"
+        "TipoPagoRet"
+        )
     local plataformasTecnologicas_ServiciosPlataformasTecnologicas=(
         "Periodicidad"
         "NumServ"
@@ -514,6 +522,10 @@ parse_retencion () {
             parseElementAttributesByStr retenciones_Totales "$ATTRIBUTES"
             echo
             ;;
+        "retenciones:ImpRetenidos" )
+            parseElementAttributesByStr retenciones_ImpRetenidos "$ATTRIBUTES" ":"
+            echo
+            ;;
         "plataformasTecnologicas:ServiciosPlataformasTecnologicas" )
             parseElementAttributesByStr plataformasTecnologicas_ServiciosPlataformasTecnologicas "$ATTRIBUTES"
             echo
@@ -549,6 +561,9 @@ read_parse_retencion () {
     _TITLE=""
     _REC=""
     primero=1
+    local _FS="|"
+    local _FS2="+"
+    local _countRetenciones=0;
     __stack_clear
     while read_dom; do
         _OUT=$(parse_retencion)
@@ -559,8 +574,16 @@ read_parse_retencion () {
                 _REC="$(awk 'BEGIN{FS="\n"; RS="^^"}{print $2}' <<< "$_OUT")"
                 primero=0
             else
-                _TITLE="${_TITLE}|$(awk 'BEGIN{FS="\n"; RS="^^"}{print $1}' <<< "$_OUT")"
-                _REC="${_REC}|$(awk 'BEGIN{FS="\n"; RS="^^"}{print $2}' <<< "$_OUT")"
+                local _separador="$_FS"
+                if [[ "$TAG_NAME" == "retenciones:ImpRetenidos" ]]; then
+                    _countRetenciones=$((_countRetenciones+1))
+                    [[ _countRetenciones -gt 1 ]] && _separador="$_FS2"
+                fi
+                if [[ "$TAG_NAME" == "tfd:TimbreFiscalDigital" ]]; then
+                    [[ _countRetenciones -eq 0 ]] && _separador="${_FS}${_FS}"
+                fi
+                _TITLE="${_TITLE}${_separador}$(awk 'BEGIN{FS="\n"; RS="^^"}{print $1}' <<< "$_OUT")"
+                _REC="${_REC}${_separador}$(awk 'BEGIN{FS="\n"; RS="^^"}{print $2}' <<< "$_OUT")"
             fi
         fi
     done
