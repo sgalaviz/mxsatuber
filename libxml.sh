@@ -692,6 +692,7 @@ function identificarGastosNoUtiles () {
     rm "$TMP/rfcEmisoresNoUtil.tmp"
 }
 
+# HOME_FACTURAS="/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/facturas"
 # cd "$HOME_PROJECT/mxsatuber"
 # source libxml.sh
 # recibidas=$(ls -d "$HOME_FACTURAS/recibidas"/*.xml)
@@ -711,7 +712,7 @@ function identificarGastosNoUtiles () {
 # awk 'BEGIN{FS="|";OFS=FS;}{print $23,$14,$15,$17,$18,$4,$9,$7,$22}' <<< "$registros"
 #
 # ANNIO=2022
-# retenciones=$(ls -d "$HOME_FACTURAS/retenciones"/*.xml)
+# retenciones=$(find "$HOME_FACTURAS" -iname *.xml)
 # MES=5
 # 
 # retencionesMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -lP 'Periodo [^"]+"[^"]+" MesFin="0?'$MES'" (Ejerc|Ejercicio)="'$ANNIO'"' $retenciones; IFS=$tmpIFS;)
@@ -721,5 +722,5 @@ function identificarGastosNoUtiles () {
 # for MES in {1..12}; do
 #   retencionesMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -lP 'Periodo [^"]+"[^"]+" MesFin="0?'$MES'" (Ejerc|Ejercicio)="'$ANNIO'"' $retenciones; IFS=$tmpIFS;)
 #   registros=$(tmpIFS=$IFS; IFS=$'\n'; for archivo in $retencionesMes; do cat "$archivo" | read_parse_retencion; done; IFS=$tmpIFS;)
-#   awk 'BEGIN{FS="|";OFS=FS;}{print $27,$5,$6,$9,$10,$3,$13,$14,$15,$24,$23}' <<< "$registros"
+#   awk 'BEGIN{FS="|";OFS=FS;}{print ($27!=""?$27:$19),$5,$6,$9,$10,$3,$13,$14,$15,($24!=""?$24:($18==0?$18:"?")),($23!=""?$23:($18==0?$18:"?"))}' <<< "$registros"
 # done
