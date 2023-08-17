@@ -745,5 +745,6 @@ function identificarGastosNoUtiles () {
 # for MES in {1..12}; do
 #   retencionesMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -lP 'Periodo [^"]+"[^"]+" MesFin="0?'$MES'" (Ejerc|Ejercicio)="'$ANNIO'"' $retenciones; IFS=$tmpIFS;)
 #   registros=$(tmpIFS=$IFS; IFS=$'\n'; for archivo in $retencionesMes; do cat "$archivo" | read_parse_retencion; done; IFS=$tmpIFS;)
-#   awk 'BEGIN{FS="|";OFS=FS;}{print ($27!=""?$27:$19),$5,$6,$9,$10,$3,$13,$14,$15,($24!=""?$24:($18==0?$18:"?")),($23!=""?$23:($18==0?$18:"?"))}' <<< "$registros"
+#   #echo "$registros"
+#   awk -f retencion.awk <<< "$registros"
 # done
