@@ -301,6 +301,7 @@ parse_cfdi () {
         )
     local tfd_TimbreFiscalDigital=(
         "UUID"
+        "FechaTimbrado"
         )
     local nomina12_Percepciones=(
         TotalSueldos
@@ -379,6 +380,7 @@ parse_cfdi () {
             echo
             ;;
         "tfd:TimbreFiscalDigital" )
+            echodebug "$ATTRIBUTES"
             parseElementAttributesByStr tfd_TimbreFiscalDigital "$ATTRIBUTES"
             echo
             ;;
@@ -397,7 +399,7 @@ parse_cfdi () {
             ;;
         * )
             # Tag no identificado previamente
-            printf "%s\n" "$TAG_NAME"
+            # printf "%s\n" "$TAG_NAME"
             ;;
     esac
 }
@@ -718,22 +720,58 @@ function identificarGastosNoUtiles () {
 # HOME_FACTURAS="/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/facturas"
 # cd "$HOME_PROJECT/mxsatuber"
 # source libxml.sh
-# recibidas=$(ls -d "$HOME_FACTURAS/recibidas"/*.xml)
+# recibidas=$(find "$HOME_FACTURAS" -iname *.xml)
 # listadoRFCDeducibles='/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/rfcEmisoresGastosDeducibles.txt'
 # listadoRFCNoUtil='/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/rfcEmisoresGastosNoUtil.txt'
 # rfcDeducibles=$(cut -f1 "$listadoRFCDeducibles")
 # rfcNoUtil=$(cut -f1 "$listadoRFCNoUtil")
 # ANNIO=2022
 # MES=04
-# recibidasMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -l 'FechaTimbrado="'$ANNIO'-'$MES $recibidas; IFS=$tmpIFS;)
+# recibidasMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -l 'Fecha="'$ANNIO'-'$MES $recibidas; IFS=$tmpIFS;)
 # facturasGastos=$(identificarFacturasUtiles "$recibidasMes")
 # deducciones=$(identificarFacturasDeduccionesPersonales "$facturasGastos" "$rfcDeducibles")
 # gastos=$(identificarFacturasDeduccionesPersonales "$facturasGastos" "$rfcDeducibles" false)
 # gastos=$(identificarGastosNoUtiles "$gastos" "$rfcNoUtil" false)
 # registros=$(tmpIFS=$IFS; IFS=$'\n'; for archivo in $gastos; do cat "$archivo" | read_parse_cfdi; done; IFS=$tmpIFS;)
 # Imprimir los registros en formato compatible con "HOJA DE TRABAJO"
-# awk 'BEGIN{FS="|";OFS=FS;}{print $23,$14,$15,$17,$18,$4,$9,$7,$22}' <<< "$registros"
-#
+# awk -f gastos.awk <<< "$registros"
+
+# Obtiene los gastos "utiles" del año indicado
+# @param PATH_FACTURAS - Ruta donde están las facturas CFDI (xml) de los gastos
+# @param AÑO - Año del ejercicio fiscal 
+function getGastos() {
+    [[ -z "$1" ]] && { echoerr "Indique path padre donde están las facturas xml. Se hará una búsqueda en profundidad buscando por archivos XML a partir de la ruta indicada"; return 1; }
+    [[ -z "$2" ]] && { echoerr "Indique el año fiscal"; return 1; }
+    [[ -z "$3" ]] && { echoerr "Indique archivo con listado de RFC deducibles"; return 1; }
+    [[ -z "$4" ]] && { echoerr "Indique archivo con listado de RFC no utiles como gastos"; return 1; }
+    local _path_facturas="${1}"
+    local ANNIO="${2}"
+    local listadoRFCDeducibles="${3}"
+    local listadoRFCNoUtil="${4}"
+    local recibidas=$(find "${_path_facturas}" -iname *.xml)
+    local rfcDeducibles=$(cut -f1 "$listadoRFCDeducibles")
+    local rfcNoUtil=$(cut -f1 "$listadoRFCNoUtil")
+    for MES in {1..12}; do
+        # Identificar CFDI/XML eimitidos del mes
+        recibidasMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -lP 'Fecha="'$ANNIO'-0?'$MES $recibidas; IFS=$tmpIFS;)
+        # De lo recibido del mes, identificar los posibles candidatos de gastos
+        echo "$recibidasMes"
+        facturasGastos=$(identificarFacturasUtiles "$recibidasMes")
+        # Las deducciones no son computables como gastos, sirve para la declaracion anual
+        deducciones=$(identificarFacturasDeduccionesPersonales "$facturasGastos" "$rfcDeducibles")
+        # Busca las facturas que no son deducciones = gastos útiles para declaracion mensual
+        gastos=$(identificarFacturasDeduccionesPersonales "$facturasGastos" "$rfcDeducibles" false)
+        echo "$gastos"
+        # De los gastos indentificados, eliminar los que no son útiles
+        gastos=$(identificarGastosNoUtiles "$gastos" "$rfcNoUtil" false)
+        # Analizar cada gasto (archivo xml)
+#        registros=$(tmpIFS=$IFS; IFS=$'\n'; for archivo in $gastos; do cat "$archivo" | read_parse_cfdi; done; IFS=$tmpIFS;)
+        #echo "$registros"
+        # Imprimir reporte
+#        awk -f gastos.awk <<< "$registros"
+    done
+}
+
 # ANNIO=2022
 # retenciones=$(find "$HOME_FACTURAS" -iname *.xml)
 # MES=5
