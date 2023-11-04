@@ -717,12 +717,13 @@ function identificarGastosNoUtiles () {
     rm "$TMP/rfcEmisoresNoUtil.tmp"
 }
 
-# HOME_FACTURAS="/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/facturas"
+# HOME_SAT="/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT"
+# HOME_FACTURAS="${HOME_SAT}/facturas"
 # cd "$HOME_PROJECT/mxsatuber"
 # source libxml.sh
 # recibidas=$(find "$HOME_FACTURAS" -iname *.xml)
-# listadoRFCDeducibles='/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/rfcEmisoresGastosDeducibles.txt'
-# listadoRFCNoUtil='/cygdrive/c/Users/PC BEAR/Dropbox/personal/fiscal/PlataformaTecnológicaUber/SAT/rfcEmisoresGastosNoUtil.txt'
+# listadoRFCDeducibles="${HOME_SAT}/rfcEmisoresGastosDeducibles.txt"
+# listadoRFCNoUtil="${HOME_SAT}/rfcEmisoresGastosNoUtil.txt"
 # rfcDeducibles=$(cut -f1 "$listadoRFCDeducibles")
 # rfcNoUtil=$(cut -f1 "$listadoRFCNoUtil")
 # ANNIO=2022
@@ -751,25 +752,31 @@ function getGastos() {
     local recibidas=$(find "${_path_facturas}" -iname *.xml)
     local rfcDeducibles=$(cut -f1 "$listadoRFCDeducibles")
     local rfcNoUtil=$(cut -f1 "$listadoRFCNoUtil")
+    local _OUT=""
+    local _LF=""
     for MES in {1..12}; do
+        echoerr "Procesando mes %02d-%d\n" ${MES} ${ANNIO}
         # Identificar CFDI/XML eimitidos del mes
         recibidasMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -lP 'Fecha="'$ANNIO'-0?'$MES $recibidas; IFS=$tmpIFS;)
         # De lo recibido del mes, identificar los posibles candidatos de gastos
-        echo "$recibidasMes"
+        # echo "$recibidasMes"
+        [[ -z "$recibidasMes" ]] && continue;
         facturasGastos=$(identificarFacturasUtiles "$recibidasMes")
         # Las deducciones no son computables como gastos, sirve para la declaracion anual
         deducciones=$(identificarFacturasDeduccionesPersonales "$facturasGastos" "$rfcDeducibles")
         # Busca las facturas que no son deducciones = gastos útiles para declaracion mensual
         gastos=$(identificarFacturasDeduccionesPersonales "$facturasGastos" "$rfcDeducibles" false)
-        echo "$gastos"
+        # echo "$gastos"
         # De los gastos indentificados, eliminar los que no son útiles
         gastos=$(identificarGastosNoUtiles "$gastos" "$rfcNoUtil" false)
         # Analizar cada gasto (archivo xml)
-#        registros=$(tmpIFS=$IFS; IFS=$'\n'; for archivo in $gastos; do cat "$archivo" | read_parse_cfdi; done; IFS=$tmpIFS;)
+        registros=$(tmpIFS=$IFS; IFS=$'\n'; for archivo in $gastos; do cat "$archivo" | read_parse_cfdi; done; IFS=$tmpIFS;)
         #echo "$registros"
         # Imprimir reporte
-#        awk -f gastos.awk <<< "$registros"
+        [[ $MES -gt 1 ]] && printf -v _LF "\n"
+        printf -v _OUT "%s%s$(awk -f gastos.awk <<< "$registros")" "${_OUT}" "$_LF"
     done
+    sort -u <<< "$_OUT"
 }
 
 # ANNIO=2022
@@ -786,3 +793,55 @@ function getGastos() {
 #   #echo "$registros"
 #   awk -f retencion.awk <<< "$registros"
 # done
+
+# Encontrar factura
+# cygpath -w "$(find "$HOME_FACTURAS" -iname *.xml | grep -i $UUID)"
+
+function identificarRetencionesPorRFC () {
+    # set -x
+    [[ -z "$1" ]] && { echoerr "Se requiere listado de archivos xml"; return 1; }
+    [[ -z "$2" ]] && { echoerr "Se requiere listado de RFC a buscar"; return 1; }
+    local _invertido=false
+    [[ -n "$3" && "$3"=="false" ]] && _invertido=true;
+    local facturasCandidatas="$1"
+    local rfcRetenedor="$2"
+    local rfcDeducibles=$(cut -f1 "$listadoRFCDeducibles")
+    echo "$rfcRetenedor" > "$TMP/rfcRetenedor.tmp"
+    # Obliga a usar solamente \n como separador de registro en el listado de archivos entregados.
+    # Esto evita problemas en nombre de directorios donde haya espacios
+    local IFS=$'\n'
+    for archivo in ${facturasCandidatas}; do
+        _TMP=$(grep -f "$TMP/rfcRetenedor.tmp" "$archivo");
+        local _R=$?
+        [ $_R -eq 0 ] && echo "$archivo";
+    done;
+    rm "$TMP/rfcRetenedor.tmp"
+    # set +x
+}
+
+function getRetenciones() {
+    [[ -z "$1" ]] && { echoerr "Indique path padre donde están las facturas xml. Se hará una búsqueda en profundidad buscando por archivos XML a partir de la ruta indicada"; return 1; }
+    [[ -z "$2" ]] && { echoerr "Indique el año fiscal"; return 1; }
+    local _path_facturas="${1}"
+    local ANNIO="${2}"
+    local listadoRFCRetenedores="${3}"
+    local retenciones=$(find "${_path_facturas}" -iname *.xml)
+
+    if [[ -n "${3}" ]]; then
+        [[ ! -f "${listadoRFCRetenedores}" ]] && { echoerr "No es un archivo: ${listadoRFCRetenedores}"; return 1; }
+        local rfcRetenedor=$(cut -f1 "$listadoRFCRetenedores")
+        retenciones=$(identificarRetencionesPorRFC "$retenciones" "$rfcRetenedor")
+    fi
+
+    # [[ -n "$3" ]] && { echoerr "Indique archivo con listado de RFC retenedores"; return 1; }
+    local _OUT=""
+    local _LF=""
+    for MES in {1..12}; do
+        echoerr "Procesando mes %02d-%d\n" ${MES} ${ANNIO}
+        retencionesMes=$(tmpIFS=$IFS; IFS=$'\n'; grep -lP 'Periodo [^"]+"[^"]+" MesFin="0?'$MES'" (Ejerc|Ejercicio)="'$ANNIO'"' $retenciones; IFS=$tmpIFS;)
+        [[ -z "$retencionesMes" ]] && continue;
+        registros=$(tmpIFS=$IFS; IFS=$'\n'; for archivo in $retencionesMes; do cat "$archivo" | read_parse_retencion; done; IFS=$tmpIFS;)
+        #echo "$registros"
+        awk -f retencion.awk <<< "$registros"
+    done
+}
