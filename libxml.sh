@@ -795,7 +795,7 @@ function getGastos() {
 # done
 
 # Encontrar factura
-# cygpath -w "$(find "$HOME_FACTURAS" -iname *.xml | grep -i $UUID)"
+# find "$HOME_FACTURAS" -iname $UUID* -exec cygpath -w '{}' \;
 
 function identificarRetencionesPorRFC () {
     # set -x
@@ -845,3 +845,8 @@ function getRetenciones() {
         awk -f retencion.awk <<< "$registros"
     done
 }
+
+# Modo de uso
+# Obtencion de gastos
+# cd "$HOME_PROJECT/mxsatuber"; printf -v MESACTUAL "%(%m)T";printf -v ANNIO "%(%Y)T" -1; listadoRFCDeducibles="${HOME_SAT}/rfcEmisoresGastosDeducibles.txt"; listadoRFCNoUtil="${HOME_SAT}/rfcEmisoresGastosNoUtil.txt"; source libxml.sh; time getGastos "$HOME_FACTURAS" $ANNIO "$listadoRFCDeducibles" "$listadoRFCNoUtil" | tee gastos$ANNIO-$MESACTUAL.log
+# getRetenciones "$HOME_FACTURAS" $ANNIO | tee retenciones$ANNIO.log
