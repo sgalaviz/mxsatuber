@@ -775,8 +775,12 @@ function getGastos() {
         # Imprimir reporte
         [[ $MES -gt 1 ]] && printf -v _LF "\n"
         printf -v _OUT "%s%s$(awk -f gastos.awk <<< "$registros")" "${_OUT}" "$_LF"
+        registros=$(tmpIFS=$IFS; IFS=$'\n'; for archivo in $deducciones; do cat "$archivo" | read_parse_cfdi; done; IFS=$tmpIFS;)
+        printf -v _OUTDeducible "%s%s$(awk -f gastos.awk <<< "$registros")" "${_OUTDeducible}" "$_LF"
     done
     sort -u <<< "$_OUT"
+    echo "Gastos Deducibles"
+    sort -u <<< "$_OUTDeducible"
 }
 
 # ANNIO=2022
