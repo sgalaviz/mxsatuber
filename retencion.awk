@@ -21,7 +21,7 @@ function sumarRet(campo,tipoRetencion) {
 }
 BEGIN {
     FS="|";
-    OFS=FS;
+    OFS="\t";
     tipoIVA=2;
     tipoISR=1;
 }{
